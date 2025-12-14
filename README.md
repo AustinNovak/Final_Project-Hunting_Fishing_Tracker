@@ -1,40 +1,46 @@
 # Final_Project-Hunting_Fishing_Tracker
 
-A REST API for logging outdoor trips (hunting/fishing), tracking species caught, and managing users.  
-Built using **Node.js**, **Express**, and **Sequelize (SQLite)**.  
-Includes full CRUD for Users, Trips, and Species.
+**Live API URL (Render):** https://final-project-hunting-fishing-tracker.onrender.com
+
+A production-ready RESTful API for logging outdoor trips (hunting and fishing), tracking species caught, and managing users with JWT-based authentication, role-based authorization, and ownership enforcement.
+
+Built with **Node.js**, **Express**, and **Sequelize (SQLite)**. Includes full CRUD, search & filtering endpoints, automated testing, and cloud deployment.
 
 ---
 
 ## Features
 
-- User management (create, register, update, delete)
-- Trip logging with weather, gear, notes, and location
-- Species logged per trip (quantity, measurement, notes)
-- Sequelize ORM with SQLite database
-- Isolated test database using Jest + Supertest
-- Clear and structured API routes across `/api/users`, `/api/trips`, `/api/species`
-- Works locally and deployable to Render/Heroku
+- JWT authentication (register, login, logout)
+- Protected routes with ownership enforcement
+- Role-based authorization (`user`, `admin`)
+- Trip logging with date, location, type, weather, gear, and notes
+- Species tracking per trip
+- Search & filter endpoints (advanced functionality)
+- Sequelize ORM with SQLite
+- Isolated Jest + Supertest test database
+- Deployed to Render (production-ready)
 
 ---
 
 ## Tech Stack
 
 - **Node.js + Express**
-- **SQLite + Sequelize**
-- **Jest + Supertest**
-- **bcryptjs** (for password hashing)
+- **Sequelize ORM**
+- **SQLite**
+- **JWT** (jsonwebtoken)
+- **bcryptjs**
 - **cors**
 - **dotenv**
+- **Jest + Supertest**
 
 ---
 
-## Installation & Setup
+## Installation & Local Setup
 
 ### 1. Clone the Repository
 ```bash
-git clone <your_repo_url>
-cd <project_folder>
+git clone <your-repo-url>
+cd Final_Project-Hunting_Fishing_Tracker
 ```
 
 ### 2. Install Dependencies
@@ -42,7 +48,8 @@ cd <project_folder>
 npm install
 ```
 
-### 3. Create a .env File
+### 3. Create `.env` File
+
 Create a `.env` file in the project root:
 ```
 NODE_ENV=development
@@ -51,20 +58,15 @@ DB_NAME=final_project.db
 JWT_SECRET=dev-secret
 JWT_EXPIRES_IN=24h
 ```
-Do NOT commit this file.
 
-### 4. Initialize Database
-These scripts run database sync and seeding.
-```bash
-npm run setup     # create database without forcing reset
-npm run seed      # force reset database and reseed
-```
+⚠️ **Do NOT commit `.env`**
 
-### 5. Start the Server
+### 4. Start Server
 ```bash
 npm start
 ```
-Server will run on:
+
+Server runs at:
 ```
 http://localhost:3000
 ```
@@ -72,60 +74,95 @@ http://localhost:3000
 ---
 
 ## Running Tests
-A separate test database (`test_final_project.db`) is automatically created and cleaned.
 
-Run the test suite:
+A separate SQLite test database is automatically created and destroyed.
 ```bash
 npm test
 ```
-All tests use Supertest and do not touch your main DB.
+
+✔ All tests run with Supertest  
+✔ No impact to production or dev database
 
 ---
 
-## Database Models
+## Authentication Guide
 
-### User
-| Field    | Type    |
-|----------|---------|
-| id       | integer |
-| name     | string  |
-| email    | string  |
-| password | string  |
+### Register
 
-A User has many Trips.
+**POST /api/auth/register**
 
-### Trip
-| Field    | Type                        |
-|----------|-----------------------------|
-| id       | integer                     |
-| date     | string                      |
-| location | string                      |
-| type     | string (fishing, hunting, etc.) |
-| weather  | string                      |
-| notes    | string                      |
-| gear     | string                      |
-| userId   | FK to User                  |
+**Body:**
+```json
+{
+  "name": "Austin",
+  "email": "austin@example.com",
+  "password": "password123"
+}
+```
 
-A Trip has many Species.
+**Response (201):**
+```json
+{
+  "id": 1,
+  "name": "Austin",
+  "email": "austin@example.com"
+}
+```
 
-### Species
-| Field        | Type       |
-|--------------|------------|
-| id           | integer    |
-| speciesName  | string     |
-| quantity     | integer    |
-| measurement  | string     |
-| notes        | string     |
-| tripId       | FK to Trip |
+### Login
+
+**POST /api/auth/login**
+
+**Body:**
+```json
+{
+  "email": "austin@example.com",
+  "password": "password123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "token": "JWT_TOKEN_HERE"
+}
+```
+
+### Logout
+
+**POST /api/auth/logout**
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Response (200):**
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+ℹ️ Logout is client-side token invalidation.
+
+---
+
+## Authorization Rules
+
+| Role  | Permissions                              |
+|-------|------------------------------------------|
+| User  | CRUD only on their own trips & species   |
+| Admin | Access to all trips & species            |
+
+**All protected routes require:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
 
 ---
 
 ## API Endpoints
-
-**Base URL:**
-```
-http://localhost:3000
-```
 
 ### Health Check
 
@@ -143,145 +180,149 @@ Returns server status.
 
 ---
 
-### Users API
+### 🎣 Trips API
 
-#### POST /api/users/register
-Create a new user.
+#### Get Trips (Protected)
+
+**GET /api/trips**
+
+Returns:
+- **Admin** → all trips
+- **User** → only their trips
+
+#### Search / Filter Trips (Advanced Feature)
+
+**GET /api/trips/search**
+
+**Query Params:**
+- `type=fishing|hunting`
+- `startDate=YYYY-MM-DD`
+- `endDate=YYYY-MM-DD`
+
+**Example:**
+```
+/api/trips/search?type=fishing
+```
+
+#### Get Trip by ID
+
+**GET /api/trips/:id**
+
+Ownership enforced.
+
+#### Get Full Trip (Trip + Species)
+
+**GET /api/trips/:id/full**
+
+Returns trip with all associated species.
+
+#### Create Trip
+
+**POST /api/trips**
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
 
 **Body:**
-```json
-{
-  "name": "Austin",
-  "email": "austin@example.com",
-  "password": "pass123"
-}
-```
-
-**Success: 201**
-```json
-{
-  "id": 1,
-  "name": "Austin",
-  "email": "austin@example.com"
-}
-```
-
-#### POST /api/users
-Admin-style create user (same as register).
-
-#### GET /api/users
-Returns a list of all users.
-
-#### GET /api/users/:id
-Returns a user with all trips included.
-
-**Success Example:**
-```json
-{
-  "id": 1,
-  "name": "Austin",
-  "email": "austin@example.com",
-  "Trips": [
-    { "id": 3, "location": "Test Lake", "..." }
-  ]
-}
-```
-
-#### PUT /api/users/:id
-Update user fields.
-
-**Body Example:**
-```json
-{ "name": "Updated Name" }
-```
-
-#### DELETE /api/users/:id
-Deletes a user.
-
----
-
-### Trips API
-
-#### GET /api/trips
-Returns all trips with User info populated.
-
-#### GET /api/trips/:id
-Returns one trip, including Species entries.
-
-#### POST /api/trips
-**Required fields:**
-- date
-- location
-- type
-- userId
-
-**Example Body:**
 ```json
 {
   "date": "2025-07-01",
   "location": "Test Lake",
   "type": "fishing",
-  "weather": "Calm",
+  "weather": "Clear",
   "notes": "Great day",
-  "gear": "Rod + Reel",
-  "userId": 1
+  "gear": "Rod & Reel"
 }
 ```
 
-**Success:**
+**Success (201):**
 ```json
 {
   "id": 3,
   "date": "2025-07-01",
   "location": "Test Lake",
   "type": "fishing",
-  "weather": "Calm",
+  "weather": "Clear",
   "notes": "Great day",
-  "gear": "Rod + Reel",
+  "gear": "Rod & Reel",
   "userId": 1,
   "createdAt": "...",
   "updatedAt": "..."
 }
 ```
 
-#### PUT /api/trips/:id
-Update any trip fields.
+#### Update Trip
 
-#### DELETE /api/trips/:id
-Delete trip.
+**PUT /api/trips/:id**
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Body Example:**
+```json
+{
+  "weather": "Partly Cloudy",
+  "notes": "Updated notes"
+}
+```
+
+#### Delete Trip
+
+**DELETE /api/trips/:id**
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
 
 ---
 
-### Species API
+### 🐟 Species API
 
-#### GET /api/species
-List all species logs.
+#### Get Species (Protected)
 
-#### GET /api/species/:id
-Return a single species record.
+**GET /api/species**
 
-#### POST /api/species
-**Required fields:**
-- speciesName
-- tripId
+Returns species from trips the user owns.
 
-**Optional:**
-- quantity
-- measurement
-- notes
+#### Search Species (Advanced Feature)
 
-**Example Body:**
+**GET /api/species/search?name=bass**
+
+**Query Params:**
+- `name` - Search by species name (partial match)
+
+#### Get Species by ID
+
+**GET /api/species/:id**
+
+Ownership enforced.
+
+#### Create Species
+
+**POST /api/species**
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Body:**
 ```json
 {
   "speciesName": "Largemouth Bass",
   "quantity": 2,
   "measurement": "1.5 lbs",
   "notes": "Caught near dock",
-  "tripId": 3
+  "tripId": 1
 }
 ```
 
-**Success:**
+**Success (201):**
 ```json
 {
   "id": 10,
@@ -289,37 +330,142 @@ Return a single species record.
   "quantity": 2,
   "measurement": "1.5 lbs",
   "notes": "Caught near dock",
-  "tripId": 3
+  "tripId": 1,
+  "createdAt": "...",
+  "updatedAt": "..."
 }
 ```
 
-#### PUT /api/species/:id
-Update species record.
+#### Update Species
 
-#### DELETE /api/species/:id
-Delete species record.
+**PUT /api/species/:id**
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**Body Example:**
+```json
+{
+  "quantity": 3,
+  "measurement": "2.0 lbs"
+}
+```
+
+#### Delete Species
+
+**DELETE /api/species/:id**
+
+**Headers:**
+```
+Authorization: Bearer <JWT_TOKEN>
+```
 
 ---
 
-## Example cURL Commands
+## 🗄 Database Models
 
-### Create User
+### User
+| Field    | Type    |
+|----------|---------|
+| id       | integer |
+| name     | string  |
+| email    | string  |
+| password | string  |
+| role     | string  |
+
+A User has many Trips.
+
+### Trip
+| Field    | Type                              |
+|----------|-----------------------------------|
+| id       | integer                           |
+| date     | string                            |
+| location | string                            |
+| type     | string (fishing, hunting, etc.)   |
+| weather  | string                            |
+| notes    | string                            |
+| gear     | string                            |
+| userId   | FK to User                        |
+
+A Trip has many Species.
+
+### Species
+| Field        | Type       |
+|--------------|------------|
+| id           | integer    |
+| speciesName  | string     |
+| quantity     | integer    |
+| measurement  | string     |
+| notes        | string     |
+| tripId       | FK to Trip |
+
+---
+
+## 🚀 Deployment (Render)
+
+- **Platform:** Render
+- **Environment:** Production
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+- **Database:** SQLite (resets on redeploy)
+- **Environment variables:** Set via Render dashboard
+
+**Live URL:** https://final-project-hunting-fishing-tracker.onrender.com
+
+---
+
+## 🧪 Example cURL Commands
+
+### Register User
 ```bash
-curl -X POST http://localhost:3000/api/users/register \
+curl -X POST https://final-project-hunting-fishing-tracker.onrender.com/api/auth/register \
 -H "Content-Type: application/json" \
--d '{"name":"Austin","email":"a@a.com","password":"1234"}'
+-d '{"name":"Austin","email":"austin@example.com","password":"password123"}'
+```
+
+### Login
+```bash
+curl -X POST https://final-project-hunting-fishing-tracker.onrender.com/api/auth/login \
+-H "Content-Type: application/json" \
+-d '{"email":"austin@example.com","password":"password123"}'
 ```
 
 ### Create Trip
 ```bash
-curl -X POST http://localhost:3000/api/trips \
+curl -X POST https://final-project-hunting-fishing-tracker.onrender.com/api/trips \
 -H "Content-Type: application/json" \
--d '{"date":"2025-07-01","location":"Test Lake","type":"fishing","userId":1}'
+-H "Authorization: Bearer <JWT_TOKEN>" \
+-d '{"date":"2025-07-01","location":"Test Lake","type":"fishing","weather":"Clear","notes":"Great day","gear":"Rod & Reel"}'
 ```
 
 ### Create Species
 ```bash
-curl -X POST http://localhost:3000/api/species \
+curl -X POST https://final-project-hunting-fishing-tracker.onrender.com/api/species \
 -H "Content-Type: application/json" \
--d '{"speciesName":"Bass","tripId":1}'
+-H "Authorization: Bearer <JWT_TOKEN>" \
+-d '{"speciesName":"Largemouth Bass","quantity":2,"measurement":"1.5 lbs","notes":"Caught near dock","tripId":1}'
 ```
+
+### Search Trips
+```bash
+curl -X GET "https://final-project-hunting-fishing-tracker.onrender.com/api/trips/search?type=fishing" \
+-H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+---
+
+## ✅ Submission Checklist
+
+- ✔ GitHub Repository
+- ✔ Render Deployment URL
+- ✔ README Documentation
+- ✔ Postman Collection
+
+---
+
+## 👤 Author
+
+**Austin Novak**  
+Final Project – Backend API Development
