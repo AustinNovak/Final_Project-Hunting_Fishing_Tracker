@@ -4,6 +4,9 @@ const express = require('express');
 const cors = require('cors');
 const { setupDatabase } = require('./database/setup');
 
+const authRoutes = require('./routes/authRoutes');
+
+
 const userRoutes = require('./routes/userRoutes');
 const tripRoutes = require('./routes/tripRoutes');
 const speciesRoutes = require('./routes/speciesRoutes');
@@ -26,6 +29,7 @@ app.use((req, res, next) => {
 });
 
 // ROUTES
+app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/species', speciesRoutes);

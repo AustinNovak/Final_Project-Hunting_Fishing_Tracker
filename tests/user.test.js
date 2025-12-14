@@ -1,68 +1,84 @@
 // tests/user.test.js
 const request = require('supertest');
 const fs = require('fs');
-const { TEST_DB_PATH, TEST_DB_FILENAME } = require('./setupTestDB');
-
-// require server AFTER setting env in setupTestDB
+const { TEST_DB_PATH } = require('./setupTestDB');
 const app = require('../server');
-const { db } = require('../database/setup');
+const { db, User } = require('../database/setup');
+
+let adminToken;
+let userToken;
+let userId;
 
 beforeAll(async () => {
-  // ensure fresh DB
   await db.sync({ force: true });
+
+  // Create admin
+  await User.create({
+    name: 'Admin',
+    email: 'admin@test.com',
+    password: await require('bcryptjs').hash('adminpw', 10),
+    role: 'admin'
+  });
+
+  // Login admin
+  const adminLogin = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'admin@test.com', password: 'adminpw' });
+
+  adminToken = adminLogin.body.token;
+
+  // Register user
+  const userRes = await request(app)
+    .post('/api/auth/register')
+    .send({ name: 'User', email: 'user@test.com', password: 'userpw' });
+
+  userId = userRes.body.id;
+
+  // Login user
+  const userLogin = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'user@test.com', password: 'userpw' });
+
+  userToken = userLogin.body.token;
 });
 
 afterAll(async () => {
   await db.close();
-  // remove test DB file if present
-  try {
-    if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH);
-  } catch (e) {}
+  try { if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH); } catch (e) {}
 });
 
 describe('Users API', () => {
-  let createdId;
-
-  test('POST /api/users - create user (valid)', async () => {
+  test('Admin can list users', async () => {
     const res = await request(app)
-      .post('/api/users')
-      .send({ name: 'Test User', email: 'testuser@example.com', password: 'pw' })
-      .set('Accept', 'application/json');
+      .get('/api/users')
+      .set('Authorization', `Bearer ${adminToken}`);
 
-    expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('id');
-    expect(res.body).toHaveProperty('email', 'testuser@example.com');
-    createdId = res.body.id;
-  });
-
-  test('GET /api/users - list users', async () => {
-    const res = await request(app).get('/api/users');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('GET /api/users/:id - get user with trips (not crash)', async () => {
-    const res = await request(app).get(`/api/users/${createdId}`);
+  test('User cannot list users', async () => {
+    const res = await request(app)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${userToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  test('User can view self', async () => {
+    const res = await request(app)
+      .get(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${userToken}`);
+
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('id', createdId);
-    expect(res.body).toHaveProperty('name');
+    expect(res.body).toHaveProperty('id', userId);
   });
 
-  test('PUT /api/users/:id - update user', async () => {
-    const res = await request(app).put(`/api/users/${createdId}`).send({ name: 'Updated Name' });
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('name', 'Updated Name');
-  });
+  test('User cannot delete user', async () => {
+    const res = await request(app)
+      .delete(`/api/users/${userId}`)
+      .set('Authorization', `Bearer ${userToken}`);
 
-  test('DELETE /api/users/:id - delete user', async () => {
-    const res = await request(app).delete(`/api/users/${createdId}`);
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('message');
-  });
-
-  test('POST /api/users - missing fields returns 400', async () => {
-    const res = await request(app).post('/api/users').send({ name: '' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   });
 });

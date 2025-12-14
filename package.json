@@ -4,11 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-  "start": "node server.js",
-  "setup": "node database/setup.js",
-  "seed": "node database/seed.js",
-  "test": "jest --runInBand"
-},
+    "start": "node server.js",
+    "setup": "node database/setup.js",
+    "seed": "node database/seed.js",
+    "test": "jest --runInBand"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

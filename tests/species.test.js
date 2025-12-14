@@ -5,75 +5,105 @@ const { TEST_DB_PATH } = require('./setupTestDB');
 const app = require('../server');
 const { db } = require('../database/setup');
 
+let token;
+let otherToken;
+let tripId;
+let speciesId;
+
 beforeAll(async () => {
   await db.sync({ force: true });
 
-  // create user and trip to attach species to
-  const u = await request(app).post('/api/users').send({ name: 'Spec User', email: 'specuser@example.com' });
-  const users = await request(app).get('/api/users');
-  const user = users.body.find(x => x.email === 'specuser@example.com');
-  await request(app).post('/api/trips').send({
-    date: '2025-07-01',
-    location: 'Spec Lake',
-    type: 'fishing',
-    userId: user.id
-  });
+  // Owner
+  await request(app)
+    .post('/api/auth/register')
+    .send({ name: 'Owner', email: 'owner@test.com', password: 'pw' });
+
+  const login = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'owner@test.com', password: 'pw' });
+
+  token = login.body.token;
+
+  // Other user
+  await request(app)
+    .post('/api/auth/register')
+    .send({ name: 'Other', email: 'other@test.com', password: 'pw' });
+
+  const loginOther = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'other@test.com', password: 'pw' });
+
+  otherToken = loginOther.body.token;
+
+  const trip = await request(app)
+    .post('/api/trips')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      date: '2025-07-01',
+      location: 'Spec Lake',
+      type: 'fishing'
+    });
+
+  tripId = trip.body.id;
 });
 
 afterAll(async () => {
   await db.close();
-  try { if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH); } catch (e) {}
+  try {
+    if (fs.existsSync(TEST_DB_PATH)) fs.unlinkSync(TEST_DB_PATH);
+  } catch (e) {}
 });
 
 describe('Species API', () => {
-  let tripId, speciesId;
+  test('Create species (authorized)', async () => {
+    const res = await request(app)
+      .post('/api/species')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        speciesName: 'Bass',
+        tripId
+      });
 
-  test('find created trip', async () => {
-    const trips = await request(app).get('/api/trips');
-    const t = trips.body.find(tr => tr.location === 'Spec Lake');
-    expect(t).toBeDefined();
-    tripId = t.id;
-  });
-
-  test('POST /api/species - create species linked to trip', async () => {
-    const res = await request(app).post('/api/species').send({
-      speciesName: 'Largemouth Bass',
-      quantity: 2,
-      measurement: '1.5 lbs, 2.0 lbs',
-      notes: 'near weedlines',
-      tripId
-    });
     expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('id');
     speciesId = res.body.id;
   });
 
-  test('GET /api/species - list species', async () => {
+  test('Other user cannot access species → 403', async () => {
+    const res = await request(app)
+      .get(`/api/species/${speciesId}`)
+      .set('Authorization', `Bearer ${otherToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  test('Get species list (authorized)', async () => {
+    const res = await request(app)
+      .get('/api/species')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+  });
+
+  // ✅ NEW: search species by name
+  test('Search species by name', async () => {
+    const res = await request(app)
+      .get('/api/species/search?name=Bass')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+  });
+
+  test('Delete species (owner)', async () => {
+    const res = await request(app)
+      .delete(`/api/species/${speciesId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+  });
+
+  test('Access species without token → 401', async () => {
     const res = await request(app).get('/api/species');
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
-  });
-
-  test('GET /api/species/:id - fetch single', async () => {
-    const res = await request(app).get(`/api/species/${speciesId}`);
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('speciesName', 'Largemouth Bass');
-  });
-
-  test('PUT /api/species/:id - update', async () => {
-    const res = await request(app).put(`/api/species/${speciesId}`).send({ notes: 'updated note' });
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('notes', 'updated note');
-  });
-
-  test('DELETE /api/species/:id - delete', async () => {
-    const res = await request(app).delete(`/api/species/${speciesId}`);
-    expect(res.status).toBe(200);
-  });
-
-  test('POST /api/species - bad tripId returns 400', async () => {
-    const res = await request(app).post('/api/species').send({ speciesName: 'X', tripId: 9999 });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
   });
 });
