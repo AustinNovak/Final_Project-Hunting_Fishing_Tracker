@@ -19,14 +19,9 @@ router.get("/", auth, async (req, res) => {
     });
 
     res.json(trips);
-} catch (err) {
-  console.error("CREATE TRIP ERROR:", err);
-  res.status(500).json({
-    error: "Failed to create trip",
-    details: err.message
-  });
-}
-
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch trips" });
+  }
 });
 
 /*
@@ -77,6 +72,7 @@ router.get("/:id", auth, async (req, res) => {
 
     res.json(trip);
   } catch (err) {
+    console.error("CREATE TRIP ERROR:", err);
     res.status(500).json({ error: "Failed to fetch trip" });
   }
 });
@@ -132,6 +128,7 @@ router.post("/", auth, async (req, res) => {
 
     res.status(201).json(trip);
   } catch (err) {
+    console.error("CREATE TRIP ERROR:", err);
     res.status(500).json({ error: "Failed to create trip" });
   }
 });
