@@ -468,4 +468,4 @@ curl -X GET "https://final-project-hunting-fishing-tracker.onrender.com/api/trip
 ## 👤 Author
 
 **Austin Novak**  
-Final Project – Backend API Development
+Final Project – Hunting and/or Fishing Tracker
