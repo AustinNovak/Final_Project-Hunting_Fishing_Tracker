@@ -51,7 +51,7 @@ app.use((req, res) => {
 // Start server
 async function start() {
   try {
-    await setupDatabase({ force: false });
+    await setupDatabase({ force: true });
 
     app.listen(PORT, () => {
       console.log(`Server listening on ${PORT}`);
