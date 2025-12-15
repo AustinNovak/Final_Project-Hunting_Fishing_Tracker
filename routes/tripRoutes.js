@@ -19,9 +19,14 @@ router.get("/", auth, async (req, res) => {
     });
 
     res.json(trips);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch trips" });
-  }
+} catch (err) {
+  console.error("CREATE TRIP ERROR:", err);
+  res.status(500).json({
+    error: "Failed to create trip",
+    details: err.message
+  });
+}
+
 });
 
 /*
